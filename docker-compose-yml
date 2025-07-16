@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:6.0
+    restart: unless-stopped
+    networks:
+      - novu_network
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7.0
+    restart: unless-stopped
+    networks:
+      - novu_network
+
+  mailhog:
+    image: mailhog/mailhog
+    restart: unless-stopped
+    networks:
+      - novu_network
+    ports:
+      - "8025:8025"  # Mailhog Web UI
+
+  novu-api:
+    image: novuhq/novu:latest
+    restart: unless-stopped
+    networks:
+      - novu_network
+    environment:
+      - NODE_ENV=production
+      - MONGO_URL=mongodb://mongo:27017/novu
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NOVU_API_ROOT_URL=https://yourdomain.com/api
+      - NOVU_SMTP_HOST=mailhog
+      - NOVU_SMTP_PORT=1025
+      - NOVU_SMTP_USER=
+      - NOVU_SMTP_PASS=
+    expose:
+      - "3000"
+
+  novu-web:
+    image: novuhq/admin-panel:latest
+    restart: unless-stopped
+    networks:
+      - novu_network
+    environment:
+      - NOVU_API_URL=https://yourdomain.com/api
+    expose:
+      - "4200"
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/certs:/etc/nginx/certs
+    networks:
+      - novu_network
+    depends_on:
+      - novu-api
+      - novu-web
+
+volumes:
+  mongo_data:
+
+networks:
+  novu_network:
+    driver: bridge
